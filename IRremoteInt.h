@@ -122,6 +122,9 @@
 // #define MITSUBISHI_DOUBLE_SPACE_USECS  800  // usually ssee 713 - not using ticks as get number wrapround
 // #define MITSUBISHI_RPT_LENGTH 45000
 
+#define SAMSUNG_HDR_MARK	4500
+#define SAMSUNG_HDR_SPACE	4500
+
 
 #define RC5_T1		889
 #define RC5_RPT_LENGTH	46000

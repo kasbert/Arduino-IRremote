@@ -87,6 +87,26 @@ void IRsend::sendNEC(unsigned long data, int nbits)
   space(0);
 }
 
+void IRsend::sendSamsung(unsigned long data, int nbits)
+{
+  enableIROut(38);
+  mark(SAMSUNG_HDR_MARK);
+  space(SAMSUNG_HDR_SPACE);
+  for (int i = 0; i < nbits; i++) {
+    if (data & TOPBIT) {
+      mark(NEC_BIT_MARK);
+      space(NEC_ONE_SPACE);
+    } 
+    else {
+      mark(NEC_BIT_MARK);
+      space(NEC_ZERO_SPACE);
+    }
+    data <<= 1;
+  }
+  mark(NEC_BIT_MARK);
+  space(0);
+}
+
 void IRsend::sendSony(unsigned long data, int nbits) {
   enableIROut(40);
   mark(SONY_HDR_MARK);
@@ -398,6 +418,12 @@ int IRrecv::decode(decode_results *results) {
     return DECODED;
   }
 #ifdef DEBUG
+  Serial.println("Attempting Samsung decode");
+#endif
+  if (decodeSamsung(results)) {
+    return DECODED;
+  }
+#ifdef DEBUG
   Serial.println("Attempting Sony decode");
 #endif
   if (decodeSony(results)) {
@@ -496,6 +522,56 @@ long IRrecv::decodeNEC(decode_results *results) {
   results->bits = NEC_BITS;
   results->value = data;
   results->decode_type = NEC;
+  return DECODED;
+}
+
+
+// NECs have a repeat only 4 items long
+long IRrecv::decodeSamsung(decode_results *results) {
+  long data = 0;
+  int offset = 1; // Skip first space
+  // Initial mark
+  if (!MATCH_MARK(results->rawbuf[offset], SAMSUNG_HDR_MARK)) {
+    return ERR;
+  }
+  offset++;
+  // Check for repeat
+  if (irparams.rawlen == 4 &&
+    MATCH_SPACE(results->rawbuf[offset], NEC_RPT_SPACE) &&
+    MATCH_MARK(results->rawbuf[offset+1], NEC_BIT_MARK)) {
+    results->bits = 0;
+    results->value = REPEAT;
+    results->decode_type = SAMSUNG;
+    return DECODED;
+  }
+  if (irparams.rawlen < 2 * NEC_BITS + 4) {
+    return ERR;
+  }
+  // Initial space  
+  if (!MATCH_SPACE(results->rawbuf[offset], SAMSUNG_HDR_SPACE)) {
+    return ERR;
+  }
+  offset++;
+  for (int i = 0; i < NEC_BITS; i++) {
+    if (!MATCH_MARK(results->rawbuf[offset], NEC_BIT_MARK)) {
+      return ERR;
+    }
+    offset++;
+    if (MATCH_SPACE(results->rawbuf[offset], NEC_ONE_SPACE)) {
+      data = (data << 1) | 1;
+    } 
+    else if (MATCH_SPACE(results->rawbuf[offset], NEC_ZERO_SPACE)) {
+      data <<= 1;
+    } 
+    else {
+      return ERR;
+    }
+    offset++;
+  }
+  // Success
+  results->bits = NEC_BITS;
+  results->value = data;
+  results->decode_type = SAMSUNG;
   return DECODED;
 }
 
